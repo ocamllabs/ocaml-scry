@@ -1,0 +1,4 @@
+bin: [
+  "?scry.byte"   {"scry"}
+  "?scry.native" {"scry"}
+]
