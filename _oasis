@@ -1,0 +1,23 @@
+OASISFormat: 0.3
+Name:        ocaml-scry
+Version:     0.0.0
+Synopsis:    triage based on log of failed opam build
+Authors:     --
+License:     ISC
+Plugins:     META (0.3)
+BuildTools:  ocamlbuild
+
+Library scry
+  Path: lib
+  Findlibname: ocaml-scry
+  Modules: Repo, Time, Result, Intf
+  BuildDepends: sexplib, sexplib.syntax, re, re.str, cmdliner, cow, cow.syntax
+  NativeOpt: -w @f@p@u
+  ByteOpt:   -w @f@p@u
+
+Executable scry
+  Path: lib
+  MainIs: intf.ml
+  Custom: true
+  CompiledObject: best
+  BuildDepends: ocaml-scry
