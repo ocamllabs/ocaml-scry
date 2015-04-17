@@ -1,0 +1,12 @@
+# OASIS_START
+# DO NOT EDIT (digest: f84b2b048b269aad6b2e4995573a96b7)
+version = "0.0.0"
+description = "triage based on log of failed opam build"
+requires = "sexplib sexplib.syntax re re.str cmdliner cow cow.syntax"
+archive(byte) = "scry.cma"
+archive(byte, plugin) = "scry.cma"
+archive(native) = "scry.cmxa"
+archive(native, plugin) = "scry.cmxs"
+exists_if = "scry.cma"
+# OASIS_STOP
+
