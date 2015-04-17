@@ -9,7 +9,7 @@ BuildTools:  ocamlbuild
 
 Library scry
   Path: lib
-  Findlibname: ocaml-scry
+  Findlibname: scry
   Modules: Repo, Time, Result, Intf
   BuildDepends: sexplib, sexplib.syntax, re, re.str, cmdliner, cow, cow.syntax
   NativeOpt: -w @f@p@u
@@ -20,4 +20,4 @@ Executable scry
   MainIs: intf.ml
   Custom: true
   CompiledObject: best
-  BuildDepends: ocaml-scry
+  BuildDepends: scry
