@@ -1,10 +1,10 @@
-OASISFormat: 0.3
-Name:        ocaml-scry
+OASISFormat: 0.4
+Name:        scry
 Version:     0.0.0
 Synopsis:    triage based on log of failed opam build
-Authors:     --
+Authors:     David Sheets, Thomas Gazagnaire, Qi Li
 License:     ISC
-Plugins:     META (0.3)
+Plugins:     META (0.3), DevFiles (0.3)
 BuildTools:  ocamlbuild
 
 Library scry
