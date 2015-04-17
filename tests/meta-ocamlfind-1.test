@@ -1,0 +1,22 @@
+===== ERROR while installing xapi-idl.0.9.19 =====
+# opam-version 1.1.2-rc3
+# os           linux
+# command      make all
+# path         /home/travis/.opam/system/build/xapi-idl.0.9.19
+# compiler     system (4.02.1)
+# exit-code    2
+# env-file     /home/travis/.opam/system/build/xapi-idl.0.9.19/xapi-idl-396-f936b0.env
+# stdout-file  /home/travis/.opam/system/build/xapi-idl.0.9.19/xapi-idl-396-f936b0.out
+# stderr-file  /home/travis/.opam/system/build/xapi-idl.0.9.19/xapi-idl-396-f936b0.err
+### stderr ###
+# ...[truncated]
+# Warning 3: deprecated: String.set
+# Use Bytes.set instead.
+# File "setup.ml", line 2502, characters 6-24:
+# Warning 3: deprecated: Lazy.lazy_from_fun
+# Use Lazy.from_fun instead.
+# ocamlfind: Package `xcp-rrd' not found
+# W: Field 'pkg_xcp_rrd' is not set: Command ''/home/travis/.opam/system/bin/ocamlfind' query -format %d xcp-rrd > '/tmp/oasis-3e837a.txt'' terminated with error code 2
+# E: Cannot find findlib package xcp-rrd
+# E: Failure("1 configuration error")
+# make: *** [setup.data] Error 1
