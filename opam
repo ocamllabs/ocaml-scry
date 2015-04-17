@@ -1,0 +1,22 @@
+opam-version: "1.2"
+maintainer:   "Thomas Gazagnaire <thomas@gazagnaire.org>"
+authors:       ["David Sheets" "Thomas Gazagnaire" "Qi Li"]
+homepage:      "https://github.com/ocamllabs/ocaml-scry"
+bug-reports:   "https://github.com/ocamllabs/ocaml-scry/issues/"
+dev-repo:      "https://github.com/ocamllabs/ocaml-scry.git"
+license:       "ISC"
+
+build: [
+  ["./configure" "--prefix=%{prefix}%"]
+  [make]
+]
+install: [make "install"]
+remove: ["ocamlfind" "remove" "scry"]
+depends: [
+  "ocamlfind" {build}
+  "sexplib"
+  "type_conv"
+  "re"
+  "cmdliner"
+  "cow"
+]
