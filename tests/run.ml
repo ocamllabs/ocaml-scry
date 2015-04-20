@@ -52,7 +52,7 @@ let scry_cmd =
   else if Sys.file_exists "../intf.native" then "../intf.native"
   else failwith "Not scry command found."
 
-let scry file = Printf.sprintf "%s %s %s" scry_cmd file file
+let scry file = Printf.sprintf "%s --out %s --err %s" scry_cmd file file
 
 let one test =
   let file = test ^ ".test" in

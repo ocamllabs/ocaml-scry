@@ -120,7 +120,10 @@ let rec match_global ?(pos=0) ?(lst=[]) re s =
     with Not_found -> [|-1,-1|] in
   if ofs.(0) = (-1,-1) then lst
   else
-    let matches = ofs.(0), Array.map (fun (a,z) -> String.sub s a (z-a)) ofs in
+    let matches =
+      ofs.(0), Array.map
+        (fun (a,z) -> if a = (-1) || z = (-1) then "" else String.sub s a (z-a))
+        ofs in
     match_global ~pos:(snd ofs.(0)) ~lst:(matches::lst) re s
 
 let unsat_dep_re = Re.(compile (seq [
@@ -143,8 +146,8 @@ let solver_errors_of_r { Repo.r_args; r_stdout } =
 
 let pkg_build_error_re = Re.(compile (seq [
   (* tested 2013/6/21 *)
-  bol; str "==== ERROR [while installing ";
-  group (rep1 (compl [set "]"]));
+  bol; str "===== ERROR while installing ";
+  group (rep1 (compl [space]));
 ]))
 
 let no_space_recognizer = Re.((* tested 2013/6/26 *)
@@ -261,9 +264,8 @@ let build_error_stdout_re = Re.(List.map compile_pair [
   seq [ (* tested 2013/6/21 *)
     str "E: Cannot find findlib package ";
     group (rep1 (compl [space]));
-    str " (";
-    group (rep1 (compl [set ")"]));
-  ], (fun m -> Meta (Findlib_constraint (m.(1),m.(2))));
+    opt (seq [str " ("; group (rep1 (compl [set ")"]))]);
+  ], (fun m -> Meta (Findlib_constraint (m.(1),try m.(2) with _ -> "")));
   seq [ (* tested 2013/6/21 *)
     str "The following re";
     opt (char 'c');
@@ -345,6 +347,19 @@ let system_errors_of_r { Repo.r_stderr } =
     | Some c -> c
     | None -> Multiple []
   end with _ -> Multiple []
+
+let analyze_all = Repo.(function
+  | Process (_, r) -> begin
+      let str = r.r_stdout^"\n"^r.r_stderr in
+      let r = { r with r_stdout = str; r_stderr = str } in
+      (* let analyzers = [build_errors_of_r] in *)
+      let analyzers = [ system_errors_of_r; solver_errors_of_r; build_errors_of_r;
+                        other_errors_of_r ] in
+      let results = List.filter (fun err -> not (err = Multiple []))
+                                (List.map (fun a -> a r) analyzers) in
+      Multiple results end
+  | _ -> Multiple []
+)
 
 let analyze = Repo.(function
   | Process (Exited 1,
