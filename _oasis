@@ -19,5 +19,6 @@ Executable scry
   Path: lib
   MainIs: intf.ml
   Custom: true
+  Install: false
   CompiledObject: best
   BuildDepends: scry
