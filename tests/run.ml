@@ -52,7 +52,7 @@ let scry_cmd =
   else if Sys.file_exists "../intf.native" then "../intf.native"
   else failwith "Not scry command found."
 
-let scry file = Printf.sprintf "%s --out %s --err %s" scry_cmd file file
+let scry file = Printf.sprintf "%s %s" scry_cmd file
 
 let one test =
   let file = test ^ ".test" in
@@ -68,8 +68,10 @@ let all tests =
   if !errors <> 0 then exit 1
 
 let () =
-  Sys.readdir (Sys.getcwd ())
+  let test_dir = Sys.argv.(1) in
+  Sys.readdir (Filename.concat (Sys.getcwd ()) test_dir)
   |> Array.to_list
   |> List.filter (fun f -> Filename.check_suffix f ".test")
   |> List.map (Filename.chop_extension)
+  |> List.map (Filename.concat test_dir)
   |> all

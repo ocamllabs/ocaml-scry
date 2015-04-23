@@ -45,12 +45,13 @@ with sexp
 
 (* ordered minor to severe *)
 type ext_dep_error =
+  | Opam_depext of string
+  | Wrong_depext of string * string
   | Pkg_config_constraint of string * string
   | Pkg_config of string
   | Command of string
   | Header of string
   | C_libs of string list
-  | Wrong_depext of string * string
 with sexp
 
 (* ordered minor to severe *)
@@ -127,13 +128,22 @@ let rec match_global ?(pos=0) ?(lst=[]) re s =
         ofs in
     match_global ~pos:(snd ofs.(0)) ~lst:(matches::lst) re s
 
-let unsat_dep_re = Re.(compile (seq [
+let unsat_dep_re = Re.(compile (
+  (* seq [
   (* tested 2013/6/21 *)
-  str "The dependency ";
-  group (rep1 (compl [space]));
-  str " of package ";
-  group (rep1 (compl [space]));
-  str " is not available";
+    str "The dependency ";
+    group (rep1 (compl [space]));
+    str " of package ";
+    group (rep1 (compl [space]));
+    str " is not available";]; *)
+  seq [
+    str "Your request can't be satisfied:";
+    rep1 (compl [set "-"]);
+    str "- ";
+    group (rep1 (compl [space]));
+    str " is not available because it requires ";
+    shortest (group (rep1 any));
+    eol;
 ]))
 let no_solution_re = Re.(compile (seq [
   str "No package matches ";
@@ -151,10 +161,10 @@ let solver_errors_of_r { Repo.r_args; r_stdout } =
   let matches_nosol = match_global no_solution_re r_stdout in
   if not (0 = List.length matches_unsat) then
     Multiple (List.fold_left (fun lst (_,m) ->
-      let err = Solver (Some (Unsatisfied_dep m.(1))) in
-      if List.mem m.(2) r_args
-      then err::lst
-      else (Dep (m.(2), err))::lst) [] matches_unsat)
+      let err = Solver (Some (Unsatisfied_dep m.(2))) in
+      let pkg = try m.(1) with _ -> "" in
+      if List.mem pkg r_args then err::lst
+      else (Dep (pkg, err))::lst) [] matches_unsat)
   else if not (0 = List.length matches_nosol) then Solver None
   else Multiple []
 
@@ -224,14 +234,14 @@ let build_error_stdout_re = Re.(List.map compile_pair [
     str "Package ";
     group (rep1 (compl [space]));
     str " was not found in the pkg-config search path";
-  ], (fun m -> Ext_dep (Pkg_config m.(1)));
+  ], (fun m -> Ext_dep (Pkg_config m.(1))); (*
   seq [ (* tested 2013/6/21 *)
     str "checking whether pkg-config knows about ";
     group (rep1 (compl [space]));
     str " ";
     group (seq [compl [set "o"]; shortest (rep1 any)]);
     str "... "; compl [set "o"];
-  ], (fun m -> Ext_dep (Pkg_config_constraint (m.(1),m.(2))));
+  ], (fun m -> Ext_dep (Pkg_config_constraint (m.(1),m.(2)))); *)
   seq [ (* tested 2013/6/21 *)
     str ": ";
     opt (str "fatal ");
@@ -330,6 +340,13 @@ let build_error_stdout_re = Re.(List.map compile_pair [
     group (rep1 (compl [set ")"]));
     str ") were not met"
   ], (fun m -> Ext_dep (Pkg_config_constraint (m.(1), m.(2))));
+  seq [
+    str "opam-depext: internal error, uncaught exception:";
+    rep1 (alt [eol; space]);
+    str "Failure(";
+    group (rep1 (compl [set ")"]));
+    str ")";
+  ], (fun m -> Ext_dep (Opam_depext m.(1)));
   no_space_recognizer;
   configure_must_not_run_as_root;
 ])
@@ -472,6 +489,7 @@ let rec string_of_analysis = function
   | Solver (Some Incompatible) -> "incompatible"
   | Build Error_for_warn -> "error-enabled warnings"
   | Meta (Checksum (_, _, _)) -> "invalid checksum"
+  | Ext_dep (Opam_depext info) -> "unknown opam-depext error: "^info
   | Ext_dep (Pkg_config pkg) -> "no external dependency \""^pkg^"\""
   | Ext_dep (Pkg_config_constraint (pkg, bound)) ->
       "external dependency \""^pkg^"\" must be \""^bound^"\""
