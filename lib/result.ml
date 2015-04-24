@@ -63,6 +63,7 @@ with sexp
 (* ordered minor to severe *)
 type build_error =
   | Error_for_warn
+  | Compilation of string * string * string
 with sexp
 
 (* ordered minor to severe *)
@@ -108,6 +109,7 @@ let rec class_string_of_analysis = function
   | Multiple [] -> "error"
   | Multiple xs -> class_string_of_analysis (worst_of_analysis (Multiple xs))
   | Build Error_for_warn -> "errwarn"
+  | Build (Compilation _) -> "compile"
   | Solver None
   | Solver (Some Incompatible) -> "incompat"
   | Solver (Some (Unsatisfied_dep _))
@@ -137,18 +139,19 @@ let unsat_dep_re = Re.(compile (
     group (rep1 (compl [space]));
     str " is not available";]; *)
   seq [
-    str "Your request can't be satisfied:";
+    str "The following dependencies couldn't be met:";
     rep1 (compl [set "-"]);
     str "- ";
     group (rep1 (compl [space]));
-    str " is not available because it requires ";
+    str " -> ";
     shortest (group (rep1 any));
     eol;
 ]))
 let no_solution_re = Re.(compile (seq [
   str "No package matches ";
   rep1 (compl [set "."]);
-  rep (alt [str "."; space; eol]);
+  rep1 any;
+  (* rep (alt [str "."; space; eol]); *)
   str "No solution found, exiting";
   opt (seq [
     rep1 (compl [set "\'"]);
@@ -210,6 +213,13 @@ let build_error_stderr_re = Re.(List.map compile_pair [
     str "Cannot get ";
     group (rep1 notnl);
   ], (fun m -> Transient (Broken_link (Uri.of_string m.(1))));
+  seq [
+    str "[ERROR] curl: code ";
+    rep1 (compl [space]);
+    str " while downloading";
+    rep1 (alt [eol; space]);
+    group (rep1 notnl);
+  ], (fun m -> Transient (Broken_link (Uri.of_string m.(1))));
   seq [ (* *)
     str "Internal error:\n";
     rep space;
@@ -254,6 +264,11 @@ let build_error_stdout_re = Re.(List.map compile_pair [
     group (non_greedy (rep1 any));
     str ".h' file not found";
   ], (fun m -> Ext_dep (Header m.(1)));
+  seq [
+    str "configure: error: ";
+    group (rep1 (compl [space]));
+    str " headers not found.";
+    ], (fun m -> Ext_dep (Header m.(1)));
   seq [ (* tested 2013/6/26 *)
     str "make: ";
     group (rep1 (compl [set ":"]));
@@ -347,6 +362,20 @@ let build_error_stdout_re = Re.(List.map compile_pair [
     group (rep1 (compl [set ")"]));
     str ")";
   ], (fun m -> Ext_dep (Opam_depext m.(1)));
+  seq [
+    str "File \"";
+    group (rep1 (compl [set "\""]));
+    str "\", line ";
+    group (rep1 digit);
+    alt [
+      str ":";
+      seq [
+        str ", characters ";
+        group (rep1 (compl [set ":"]));
+        str ":";]];
+    rep1 (alt [set "#-"; space; eol]);
+    str "Error: ";
+    ], (fun m -> Build (Compilation (m.(1), m.(2), m.(3))));
   no_space_recognizer;
   configure_must_not_run_as_root;
 ])
@@ -488,6 +517,9 @@ let rec string_of_analysis = function
       "unsatisfied dependency \""^dep^"\""
   | Solver (Some Incompatible) -> "incompatible"
   | Build Error_for_warn -> "error-enabled warnings"
+  | Build (Compilation (f, l, c)) ->
+     "compilation error at \""^f^"\", line "^l^
+     (if c <> "" then ", characters "^c else "" )
   | Meta (Checksum (_, _, _)) -> "invalid checksum"
   | Ext_dep (Opam_depext info) -> "unknown opam-depext error: "^info
   | Ext_dep (Pkg_config pkg) -> "no external dependency \""^pkg^"\""

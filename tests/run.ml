@@ -58,8 +58,12 @@ let one test =
   let file = test ^ ".test" in
   let result = read_file (test  ^ ".result") in
   with_process_in (scry file) (fun ic ->
-      let msg = input_line ic in
-      assert_equal test [msg] result
+     let msg =
+       let rec aux acc =
+         try aux (input_line ic :: acc)
+         with _ -> acc in
+       aux [] in
+      assert_equal test (List.rev msg) result
     )
 
 let all tests =
