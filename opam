@@ -10,7 +10,7 @@ build: [
   ["./configure" "--prefix=%{prefix}%"]
   [make]
 ]
-build-test: ["sh" "-c" "cd tests && ./run.ml ."]
+build-test: ["sh" "-c" "cd tests && ./run_tests"]
 install: [make "install"]
 remove: ["ocamlfind" "remove" "scry"]
 depends: [
