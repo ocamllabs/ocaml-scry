@@ -173,7 +173,11 @@ let solver_errors_of_r { Repo.r_args; r_stdout } =
 
 let pkg_build_error_re = Re.(compile (seq [
   (* tested 2013/6/21 *)
-  rep1 (set "="); str " ERROR while installing ";
+  rep1 (set "=");
+  alt [space; rep1 (compl [upper])];
+  str "ERROR";
+  alt [space; rep1 (compl [set "w"])];
+  str "while installing ";
   group (rep1 (compl [space]));
 ]))
 
@@ -227,8 +231,8 @@ let build_error_stderr_re = Re.(List.map compile_pair [
     str " is not available.";
   ], (fun m -> Transient (Broken_link (Uri.of_string m.(1))));
   seq [ (* tested 2013/6/26 *)
-    str "Internal error:\n";
-    rep space;
+    str "Internal error:";
+    rep (alt [eol; space]);
     str "\"";
     group (rep1 (compl [set "\""]));
     str "\": command not found.";
@@ -373,7 +377,8 @@ let build_error_stdout_re = Re.(List.map compile_pair [
         str ", characters ";
         group (rep1 (compl [set ":"]));
         str ":";]];
-    rep1 (alt [set "#-"; space; eol]);
+    rep1 (compl [upper]);
+    (* rep1 (alt [set "#-"; space; eol]); *)
     str "Error: ";
     ], (fun m -> Build (Compilation (m.(1), m.(2), m.(3))));
   no_space_recognizer;
