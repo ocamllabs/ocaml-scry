@@ -45,6 +45,8 @@ with sexp
 
 (* ordered minor to severe *)
 type ext_dep_error =
+  | Opam_depext of string
+  | Wrong_depext of string * string
   | Pkg_config_constraint of string * string
   | Pkg_config of string
   | Command of string
@@ -61,6 +63,7 @@ with sexp
 (* ordered minor to severe *)
 type build_error =
   | Error_for_warn
+  | Compilation of string * string * string
 with sexp
 
 (* ordered minor to severe *)
@@ -106,6 +109,7 @@ let rec class_string_of_analysis = function
   | Multiple [] -> "error"
   | Multiple xs -> class_string_of_analysis (worst_of_analysis (Multiple xs))
   | Build Error_for_warn -> "errwarn"
+  | Build (Compilation _) -> "compile"
   | Solver None
   | Solver (Some Incompatible) -> "incompat"
   | Solver (Some (Unsatisfied_dep _))
@@ -120,31 +124,61 @@ let rec match_global ?(pos=0) ?(lst=[]) re s =
     with Not_found -> [|-1,-1|] in
   if ofs.(0) = (-1,-1) then lst
   else
-    let matches = ofs.(0), Array.map (fun (a,z) -> String.sub s a (z-a)) ofs in
+    let matches =
+      ofs.(0), Array.map
+        (fun (a,z) -> if a = (-1) || z = (-1) then "" else String.sub s a (z-a))
+        ofs in
     match_global ~pos:(snd ofs.(0)) ~lst:(matches::lst) re s
 
-let unsat_dep_re = Re.(compile (seq [
+let unsat_dep_re = Re.(compile (
+  (* seq [
   (* tested 2013/6/21 *)
-  str "The dependency ";
-  group (rep1 (compl [space]));
-  str " of package ";
-  group (rep1 (compl [space]));
-  str " is not available";
+    str "The dependency ";
+    group (rep1 (compl [space]));
+    str " of package ";
+    group (rep1 (compl [space]));
+    str " is not available";]; *)
+  seq [
+    str "The following dependencies couldn't be met:";
+    rep1 (compl [set "-"]);
+    str "- ";
+    group (rep1 (compl [space]));
+    str " -> ";
+    shortest (group (rep1 any));
+    eol;
+]))
+let no_solution_re = Re.(compile (seq [
+  str "No package matches ";
+  rep1 (compl [set "."]);
+  rep1 any;
+  (* rep (alt [str "."; space; eol]); *)
+  str "No solution found, exiting";
+  opt (seq [
+    rep1 (compl [set "\'"]);
+    str "\'opam install ";
+    rep1 (compl [set "\'"]);
+    str "\' failed.";]);
 ]))
 let solver_errors_of_r { Repo.r_args; r_stdout } =
-  let matches = match_global unsat_dep_re r_stdout in
-  if 0 = List.length matches then Solver None
-  else Multiple (List.fold_left (fun lst (_,m) ->
-    let err = Solver (Some (Unsatisfied_dep m.(1))) in
-    if List.mem m.(2) r_args
-    then err::lst
-    else (Dep (m.(2), err))::lst
-  ) [] matches)
+  let matches_unsat = match_global unsat_dep_re r_stdout in
+  let matches_nosol = match_global no_solution_re r_stdout in
+  if not (0 = List.length matches_unsat) then
+    Multiple (List.fold_left (fun lst (_,m) ->
+      let err = Solver (Some (Unsatisfied_dep m.(2))) in
+      let pkg = try m.(1) with _ -> "" in
+      if List.mem pkg r_args then err::lst
+      else (Dep (pkg, err))::lst) [] matches_unsat)
+  else if not (0 = List.length matches_nosol) then Solver None
+  else Multiple []
 
 let pkg_build_error_re = Re.(compile (seq [
   (* tested 2013/6/21 *)
-  bol; str "==== ERROR [while installing ";
-  group (rep1 (compl [set "]"]));
+  rep1 (set "=");
+  alt [space; rep1 (compl [upper])];
+  str "ERROR";
+  alt [space; rep1 (compl [set "w"])];
+  str "while installing ";
+  group (rep1 (compl [space]));
 ]))
 
 let no_space_recognizer = Re.((* tested 2013/6/26 *)
@@ -172,7 +206,7 @@ let build_error_stderr_re = Re.(List.map compile_pair [
   seq [ (* tested 2013/6/21 *)
     str "configure: error: ";
     group (rep1 (compl [space]));
-    str " not found";
+    alt [str " not found"; str " is required"];
   ], (fun m -> Ext_dep (Pkg_config m.(1)));
   seq [ (* tested 2013/6/26 *)
     str "configure: error: Cannot find ";
@@ -183,6 +217,13 @@ let build_error_stderr_re = Re.(List.map compile_pair [
     str "Cannot get ";
     group (rep1 notnl);
   ], (fun m -> Transient (Broken_link (Uri.of_string m.(1))));
+  seq [
+    str "[ERROR] curl: code ";
+    rep1 (compl [space]);
+    str " while downloading";
+    rep1 (alt [eol; space]);
+    group (rep1 notnl);
+  ], (fun m -> Transient (Broken_link (Uri.of_string m.(1))));
   seq [ (* *)
     str "Internal error:\n";
     rep space;
@@ -190,8 +231,8 @@ let build_error_stderr_re = Re.(List.map compile_pair [
     str " is not available.";
   ], (fun m -> Transient (Broken_link (Uri.of_string m.(1))));
   seq [ (* tested 2013/6/26 *)
-    str "Internal error:\n";
-    rep space;
+    str "Internal error:";
+    rep (alt [eol; space]);
     str "\"";
     group (rep1 (compl [set "\""]));
     str "\": command not found.";
@@ -207,19 +248,19 @@ let build_error_stdout_re = Re.(List.map compile_pair [
     str "Package ";
     group (rep1 (compl [space]));
     str " was not found in the pkg-config search path";
-  ], (fun m -> Ext_dep (Pkg_config m.(1)));
+  ], (fun m -> Ext_dep (Pkg_config m.(1))); (*
   seq [ (* tested 2013/6/21 *)
     str "checking whether pkg-config knows about ";
     group (rep1 (compl [space]));
     str " ";
     group (seq [compl [set "o"]; shortest (rep1 any)]);
     str "... "; compl [set "o"];
-  ], (fun m -> Ext_dep (Pkg_config_constraint (m.(1),m.(2))));
+  ], (fun m -> Ext_dep (Pkg_config_constraint (m.(1),m.(2)))); *)
   seq [ (* tested 2013/6/21 *)
     str ": ";
     opt (str "fatal ");
     str "error: ";
-    group (rep1 (compl [set "."]));
+    group (shortest (rep1 any) (*(compl [set "."])*));
     str ".h: No such file or directory";
   ], (fun m -> Ext_dep (Header m.(1)));
   seq [ (* tested 2013/6/26 *)
@@ -227,6 +268,11 @@ let build_error_stdout_re = Re.(List.map compile_pair [
     group (non_greedy (rep1 any));
     str ".h' file not found";
   ], (fun m -> Ext_dep (Header m.(1)));
+  seq [
+    str "configure: error: ";
+    group (rep1 (compl [space]));
+    str " headers not found.";
+    ], (fun m -> Ext_dep (Header m.(1)));
   seq [ (* tested 2013/6/26 *)
     str "make: ";
     group (rep1 (compl [set ":"]));
@@ -261,9 +307,8 @@ let build_error_stdout_re = Re.(List.map compile_pair [
   seq [ (* tested 2013/6/21 *)
     str "E: Cannot find findlib package ";
     group (rep1 (compl [space]));
-    str " (";
-    group (rep1 (compl [set ")"]));
-  ], (fun m -> Meta (Findlib_constraint (m.(1),m.(2))));
+    opt (seq [str " ("; group (rep1 (compl [set ")"]))]);
+  ], (fun m -> Meta (Findlib_constraint (m.(1),try m.(2) with _ -> "")));
   seq [ (* tested 2013/6/21 *)
     str "The following re";
     opt (char 'c');
@@ -279,6 +324,63 @@ let build_error_stdout_re = Re.(List.map compile_pair [
     str "ld: cannot find -l";
     group (rep1 notnl);
   ], (fun m -> Ext_dep (C_libs [m.(1)]));
+  seq [
+    str "--external=source,";
+    group (rep1 (compl [space]));
+    rep1 any;
+    str "E: Unable to locate package ";
+    group (rep1 (compl [space]))
+  ], (fun m -> Ext_dep (Wrong_depext (m.(2), m.(1))));
+  seq [
+    str "--external=source,";
+    group (rep1 (compl [space]));
+    rep1 any;
+    str "No package ";
+    group (rep1 (compl [space]));
+    str " available."
+    ], (fun m -> Ext_dep (Wrong_depext (m.(2), m.(1))));
+  seq [
+    str "[ERROR] The compilation of ";
+    group (rep1 (compl [space]));
+    str " failed at \"pkg-config";
+    rep1 (alt [space; eol]);
+    group (rep1 (compl [set "\""]));
+    str "\".";
+  ], (fun m -> Ext_dep (Pkg_config m.(2)));
+  seq [
+    str "configure: error: ";
+    group (rep1 (compl [set "."]));
+    str ".pc not found.. Do you need to set PKG_CONFIG_PATH?"
+  ], (fun m -> Ext_dep (Pkg_config m.(1)));
+  seq [
+    str "configure: error: Package requirements (";
+    group (rep1 (compl [space]));
+    str " ";
+    group (rep1 (compl [set ")"]));
+    str ") were not met"
+  ], (fun m -> Ext_dep (Pkg_config_constraint (m.(1), m.(2))));
+  seq [
+    str "opam-depext: internal error, uncaught exception:";
+    rep1 (alt [eol; space]);
+    str "Failure(";
+    group (rep1 (compl [set ")"]));
+    str ")";
+  ], (fun m -> Ext_dep (Opam_depext m.(1)));
+  seq [
+    str "File \"";
+    group (rep1 (compl [set "\""]));
+    str "\", line ";
+    group (rep1 digit);
+    alt [
+      str ":";
+      seq [
+        str ", characters ";
+        group (rep1 (compl [set ":"]));
+        str ":";]];
+    rep1 (compl [upper]);
+    (* rep1 (alt [set "#-"; space; eol]); *)
+    str "Error: ";
+    ], (fun m -> Build (Compilation (m.(1), m.(2), m.(3))));
   no_space_recognizer;
   configure_must_not_run_as_root;
 ])
@@ -307,16 +409,14 @@ let rec last_match ?x str = function
 
 (* TODO: catch multiple package failures and ensure they match their errors *)
 let build_errors_of_r { Repo.r_args; r_stderr; r_stdout } =
-  try
-    let pkg = Re.(get (exec pkg_build_error_re r_stderr) 1) in
-    let err = match last_match r_stdout build_error_stdout_re with
-      | Some c -> c
-      | None -> search (fun () -> Multiple []) r_stderr build_error_stderr_re
-    in
-    if List.mem pkg r_args
-    then err
-    else Dep (pkg, err)
-  with _ -> Multiple []
+  let pkg = try Re.(get (exec pkg_build_error_re r_stderr) 1) with _ -> "" in
+  let err = match last_match r_stdout build_error_stdout_re with
+    | Some c -> c
+    | None -> search (fun () -> Multiple []) r_stderr build_error_stderr_re
+  in
+  if List.mem pkg r_args then err
+  else if not (pkg = "" && err = Multiple []) then Dep (pkg, err)
+  else Multiple []
 
 let incompatible_error_re = Re.(compile (seq [
   (* tested 2013/6/21 *)
@@ -345,6 +445,17 @@ let system_errors_of_r { Repo.r_stderr } =
     | Some c -> c
     | None -> Multiple []
   end with _ -> Multiple []
+
+let analyze_all = Repo.(function
+  | Process (_, r) -> begin
+      (* let analyzers = [build_errors_of_r] in *)
+      let analyzers = [ system_errors_of_r; solver_errors_of_r; build_errors_of_r;
+                        other_errors_of_r ] in
+      let results = List.filter (fun err -> not (err = Multiple []))
+                                (List.map (fun a -> a r) analyzers) in
+      Multiple results end
+  | _ -> Multiple []
+)
 
 let analyze = Repo.(function
   | Process (Exited 1,
@@ -411,7 +522,11 @@ let rec string_of_analysis = function
       "unsatisfied dependency \""^dep^"\""
   | Solver (Some Incompatible) -> "incompatible"
   | Build Error_for_warn -> "error-enabled warnings"
+  | Build (Compilation (f, l, c)) ->
+     "compilation error at \""^f^"\", line "^l^
+     (if c <> "" then ", characters "^c else "" )
   | Meta (Checksum (_, _, _)) -> "invalid checksum"
+  | Ext_dep (Opam_depext info) -> "unknown opam-depext error: "^info
   | Ext_dep (Pkg_config pkg) -> "no external dependency \""^pkg^"\""
   | Ext_dep (Pkg_config_constraint (pkg, bound)) ->
       "external dependency \""^pkg^"\" must be \""^bound^"\""
@@ -419,6 +534,7 @@ let rec string_of_analysis = function
   | Ext_dep (Command command) -> "no external dependency \""^command^"\""
   | Ext_dep (C_libs exts) -> "no external dependencies: "
       ^(String.concat ", " (List.map (fun ext -> "\""^ext^"\"") exts))
+  | Ext_dep (Wrong_depext (pkg, info)) -> "wrong package \""^pkg^"\" for "^info
   | Meta (Ocamlfind_dep dep) -> "missing ocamlfind dependency \""^dep^"\""
   | Meta (Findlib_constraint (pkg, bound)) ->
       "missing findlib constraint \""^pkg^" "^bound^"\""

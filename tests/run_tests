@@ -1,0 +1,16 @@
+#!/bin/bash
+
+echo "Get build log from opam.ocaml.org/builds..."
+./get_log_bulk.ml
+
+echo "Unescape some symbols..."
+./unescape.ml bulk_tests/
+
+echo "Generate scry results using ../intf.native"
+./generate_result.ml bulk_tests/
+
+echo "Show potential unrecognized results:"
+./show_unknow.ml bulk_tests/
+
+echo "Check results..."
+./run.ml bulk_tests/
