@@ -43,7 +43,9 @@ let unwrap_data = Nethtml.(function
 
 
 let get_latest_build digest =
-  let f tag _ = tag = "a" in
+  let f tag args =
+    tag = "a"
+    && String.length (List.assoc "href" args) = 40 in
   let a = collect_elements 1 f digest in
   let _, args, _ = unwrap_elem (List.hd a) in
   List.assoc "href" args
@@ -114,6 +116,7 @@ let () =
   let build_digest = get_html_elements  base_uri in
   let latest_build_href = get_latest_build build_digest in
   let build_table = get_html_elements (base_uri ^ latest_build_href) in
+  print_endline (base_uri ^ latest_build_href);
 
   let log_num = try (int_of_string Sys.argv.(1)) with _ -> 20 in
   let err_tds = collect_elements (2 * log_num) is_err_link build_table in
@@ -128,6 +131,6 @@ let () =
       >>= string_of_doc_lst
       >>= log_of_string dir uri in
     let dir = Filename.concat (Sys.getcwd ()) "bulk_tests" in
-    Unix.mkdir dir 0o775;
+    if not (Sys.file_exists dir) then Unix.mkdir dir 0o775;
     Lwt_list.iter_p (download_one dir) log_uris) in
   Lwt_main.run download_logs
