@@ -2,7 +2,7 @@ OASISFormat: 0.4
 Name:        scry
 Version:     0.0.0
 Synopsis:    triage based on log of failed opam build
-Authors:     David Sheets, Thomas Gazagnaire, Qi Li
+Authors:     David Sheets, Thomas Gazagnaire, Qi Li, Anil Madhavapeddy
 License:     ISC
 Plugins:     META (0.3), DevFiles (0.3)
 BuildTools:  ocamlbuild
