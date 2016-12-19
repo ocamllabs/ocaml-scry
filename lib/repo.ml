@@ -8,12 +8,12 @@ type r = {
   r_duration : Time.duration;
   r_stdout : string;
   r_stderr : string;
-} with sexp
+} [@@deriving sexp]
 
 type proc_status =
   | Exited of int
   | Signaled of int
   | Stopped of int
-with sexp
+[@@deriving sexp]
 
 exception ProcessError of proc_status * r
