@@ -1,6 +1,6 @@
 opam-version: "1.2"
 maintainer:   "Thomas Gazagnaire <thomas@gazagnaire.org>"
-authors:       ["David Sheets" "Thomas Gazagnaire" "Qi Li"]
+authors:       ["David Sheets" "Thomas Gazagnaire" "Qi Li" "Anil Madhavapeddy"]
 homepage:      "https://github.com/ocamllabs/ocaml-scry"
 bug-reports:   "https://github.com/ocamllabs/ocaml-scry/issues/"
 dev-repo:      "https://github.com/ocamllabs/ocaml-scry.git"
@@ -15,9 +15,10 @@ install: [make "install"]
 remove: ["ocamlfind" "remove" "scry"]
 depends: [
   "ocamlfind" {build}
+  "ocamlbuild" {build}
+  "ppx_sexp_conv" {build}
   "sexplib"
-  "type_conv"
   "re"
   "cmdliner"
-  "cow"
+  "uri"
 ]

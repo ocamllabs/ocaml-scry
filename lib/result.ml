@@ -28,20 +28,20 @@ end
 type solver_error =
   | Incompatible
   | Unsatisfied_dep of string (* TODO: this is pkg + constraint right now *)
-with sexp
+[@@deriving sexp]
 
 (* ordered minor to severe *)
 type system_error =
   | No_space
   | Worker_is_root
-with sexp
+[@@deriving sexp]
 
 (* ordered minor to severe *)
 type meta_error =
   | Checksum of Uri.t * string * string
   | Ocamlfind_dep of string
   | Findlib_constraint of string * string
-with sexp
+[@@deriving sexp]
 
 (* ordered minor to severe *)
 type ext_dep_error =
@@ -52,19 +52,19 @@ type ext_dep_error =
   | Command of string
   | Header of string
   | C_libs of string list
-with sexp
+[@@deriving sexp]
 
 (* ordered minor to severe *)
 type transient_error =
   | Broken_link of Uri.t
   | Opam_metadata of Uri.t
-with sexp
+[@@deriving sexp]
 
 (* ordered minor to severe *)
 type build_error =
   | Error_for_warn
   | Compilation of string * string * string
-with sexp
+[@@deriving sexp]
 
 (* ordered minor to severe *)
 type analysis =
@@ -76,23 +76,23 @@ type analysis =
   | Ext_dep of ext_dep_error
   | Build of build_error
   | Multiple of analysis list
-with sexp
+[@@deriving sexp]
 
 type error =
   | Process of Repo.proc_status * Repo.r
   | Other of string * string
-with sexp
+[@@deriving sexp]
 
 type status =
   | Passed of Repo.r
   | Failed of analysis * error
-with sexp
+[@@deriving sexp]
 
 type t = {
   status : status;
   duration : Time.duration;
   info : string;
-} with sexp
+} [@@deriving sexp]
 
 let is_failure = function Passed _ -> false | Failed (_,_) -> true
 
@@ -552,21 +552,3 @@ let string_of_status = function
   | Passed _ -> "PASS"
   | Failed (a,_) -> Printf.sprintf "FAIL (%s)" (string_of_analysis a)
 
-let to_html ({ status; duration; info } as t) =
-  let err, out = to_bufs t in
-  let status_class = match status with
-    | Passed _ -> "passed"
-    | Failed (_,_) -> "failed"
-  in <:html<
-  <div class='summary'>
-    <span class=$str:"status" ^ status_class$>$str:string_of_status status$</span>
-    in
-    <span class='duration'>$str:Time.duration_to_string duration$</span>
-  </div>
-  <span>stderr</span>
-  <pre class='stderr'>$str:err$</pre>
-  <span>stdout</span>
-  <pre class='stdout'>$str:out$</pre>
-  <span>environment</span>
-  <pre class='info'>$str:info$</pre>
-  >>
