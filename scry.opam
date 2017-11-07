@@ -7,15 +7,14 @@ dev-repo:      "https://github.com/ocamllabs/ocaml-scry.git"
 license:       "ISC"
 
 build: [
-  ["./configure" "--prefix=%{prefix}%"]
-  [make]
+  ["jbuilder" "subst" "-p" name "--name" name] {pinned}
+  ["jbuilder" "build" "-p" name "-j" jobs]
 ]
-build-test: ["sh" "-c" "cd tests && ./run_tests"]
-install: [make "install"]
-remove: ["ocamlfind" "remove" "scry"]
+build-test: [
+  ["jbuilder" "build" "-p" name "-j" jobs]
+]
 depends: [
-  "ocamlfind" {build}
-  "ocamlbuild" {build}
+  "jbuilder" {build}
   "ppx_sexp_conv" {build}
   "sexplib"
   "re"

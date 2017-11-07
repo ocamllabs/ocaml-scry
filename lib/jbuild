@@ -1,0 +1,8 @@
+(jbuild_version 1)
+
+(library
+ ((name scry)
+  (public_name scry)
+  (synopsis "analyze logs of a failed opam build and give the hint about the cause")
+  (preprocess (pps (ppx_sexp_conv)))
+  (libraries (sexplib re re.str cmdliner uri))))
