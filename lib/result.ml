@@ -531,7 +531,7 @@ let rec string_of_analysis = function
   | Ext_dep (Pkg_config_constraint (pkg, bound)) ->
       "external dependency \""^pkg^"\" must be \""^bound^"\""
   | Ext_dep (Header header) -> "no external dependency \""^header^".h\""
-  | Ext_dep (Command command) -> "no external dependency \""^command^"\""
+  | Ext_dep (Command command) -> "no external dependency command \""^command^"\""
   | Ext_dep (C_libs exts) -> "no external dependencies: "
       ^(String.concat ", " (List.map (fun ext -> "\""^ext^"\"") exts))
   | Ext_dep (Wrong_depext (pkg, info)) -> "wrong package \""^pkg^"\" for "^info

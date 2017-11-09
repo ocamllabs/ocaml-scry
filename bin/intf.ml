@@ -1,4 +1,5 @@
 open Cmdliner
+open Scry
 
 let ext = Arg.(
   value & opt int (-1) & info ["exit"]

@@ -1,4 +1,0 @@
-bin: [
-  "?_build/lib/intf.byte"   {"scry"}
-  "?_build/lib/intf.native" {"scry"}
-]
